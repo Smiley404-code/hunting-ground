@@ -102,6 +102,12 @@
   <div id="crosshair"><div class="dot"></div></div>
   <div id="hitmarker"></div>
   <div id="health-wrap"><div id="health-bar"></div><div id="health-num">100</div></div>
+  <div id="boss-wrap" style="display:none; position:absolute; top:calc(48px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); width:min(62vw,380px);">
+    <div style="text-align:center; color:#ff5252; font-size:13px; font-weight:900; letter-spacing:3px; text-shadow:0 1px 3px #000; margin-bottom:3px;">&#128520; BOSS</div>
+    <div style="height:14px; background:rgba(0,0,0,.55); border:2px solid #ff5252; border-radius:8px; overflow:hidden;">
+      <div id="boss-bar" style="height:100%; width:100%; background:linear-gradient(90deg,#b71c1c,#ff5252); transition:width .15s;"></div>
+    </div>
+  </div>
   <div class="stick-zone" id="stick-zone">
     <div id="stick-base"></div><div id="stick-nub"></div>
   </div>
@@ -116,7 +122,7 @@
   <h1>HUNTING GROUND</h1>
   <div class="sub">Drop in. Survive the waves.<br>Hunt them before they hunt you. &#127907;</div>
   <button class="big-btn" id="btn-start">&#9654; START</button>
-  <div style="position:absolute;bottom:calc(10px + env(safe-area-inset-bottom));right:14px;font-size:12px;color:#7da07d;">v1.1</div>
+  <div style="position:absolute;bottom:calc(10px + env(safe-area-inset-bottom));right:14px;font-size:12px;color:#7da07d;">v1.2</div>
   <div class="controls-hint">
     &#128241; Left stick: move &nbsp;|&nbsp; Drag right side: aim &nbsp;|&nbsp; FIRE: shoot<br>
     &#128187; WASD: move &nbsp;|&nbsp; Mouse: aim &nbsp;|&nbsp; Click: shoot
@@ -274,6 +280,7 @@ function makeEnemy(x, z){
   const e = {
     mesh:g, bodyMat:body.material, headMat:head.material,
     hp:3, speed:2.1+Math.random()*0.9+wave*0.08,
+    range:2.0, damage:8,
     attackCd:0, flashT:0, dead:false, deadT:0, bob:Math.random()*10
   };
   body.userData.enemy = e; head.userData.enemy = e;
@@ -283,8 +290,124 @@ function makeEnemy(x, z){
 }
 function killEnemy(e){
   e.dead = true; e.deadT = 0;
-  kills++; updateHUD();
+  if (e.isBoss){
+    kills += 5;
+    hp = 100;
+    document.getElementById('boss-wrap').style.display='none';
+    showBanner('BOSS DOWN! +5 KILLS');
+  } else {
+    kills++;
+  }
+  updateHUD();
   sfxDead();
+}
+
+// ============================================================ boss monster (Smiley's design)
+function createBossMonster(){
+  const boss = new THREE.Group();
+  const rockSkinMat = new THREE.MeshStandardMaterial({color:0x222428, roughness:0.85, metalness:0.2, flatShading:true});
+  const boneSpikeMat = new THREE.MeshStandardMaterial({color:0xd8dadf, roughness:0.5, metalness:0.1, flatShading:true});
+  const tornClothMat = new THREE.MeshStandardMaterial({color:0x1d3b2a, roughness:0.9, flatShading:true});
+  const eyeGlowMat = new THREE.MeshStandardMaterial({color:0xff1a1a, emissive:0xff0000, emissiveIntensity:2.5});
+
+  const chestGeo = new THREE.DodecahedronGeometry(1.35, 1);
+  chestGeo.scale(1.25, 1.15, 0.85);
+  const chest = new THREE.Mesh(chestGeo, rockSkinMat);
+  chest.position.y = 2.6;
+  boss.add(chest);
+
+  const pelvis = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.85, 0.9, 8), tornClothMat);
+  pelvis.position.y = 1.65;
+  boss.add(pelvis);
+
+  const headGroup = new THREE.Group();
+  headGroup.position.set(0, 3.65, 0.25);
+  const headGeo = new THREE.DodecahedronGeometry(0.52, 1);
+  headGeo.scale(0.9, 1.1, 0.95);
+  headGroup.add(new THREE.Mesh(headGeo, rockSkinMat));
+  const eyeGeo = new THREE.SphereGeometry(0.08, 8, 8);
+  const leftEye = new THREE.Mesh(eyeGeo, eyeGlowMat);
+  leftEye.position.set(-0.18, 0.08, 0.44);
+  const rightEye = leftEye.clone();
+  rightEye.position.x = 0.18;
+  headGroup.add(leftEye, rightEye);
+  boss.add(headGroup);
+
+  function createArm(side){
+    const armGroup = new THREE.Group();
+    armGroup.position.set(side * 1.65, 3.1, 0);
+    armGroup.add(new THREE.Mesh(new THREE.DodecahedronGeometry(0.68, 1), rockSkinMat));
+    const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 1.4, 7), rockSkinMat);
+    forearm.position.set(side * 0.2, -1.0, 0.15);
+    forearm.rotation.z = side * -0.15;
+    armGroup.add(forearm);
+    const spikeGeo = new THREE.ConeGeometry(0.14, 0.65, 5);
+    for (let i = 0; i < 5; i++){
+      const spike = new THREE.Mesh(spikeGeo, boneSpikeMat);
+      spike.position.set(side * (0.35 + (i % 2) * 0.15), -0.2 - i * 0.28, 0.25);
+      spike.rotation.z = side * -0.8;
+      spike.rotation.x = 0.3;
+      armGroup.add(spike);
+    }
+    return armGroup;
+  }
+  boss.add(createArm(-1), createArm(1));
+
+  function createLeg(side){
+    const legGroup = new THREE.Group();
+    legGroup.position.set(side * 0.62, 1.25, 0);
+    const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.42, 1.1, 7), tornClothMat);
+    thigh.position.y = -0.35;
+    legGroup.add(thigh);
+    const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, 1.1, 7), rockSkinMat);
+    shin.position.y = -1.25;
+    legGroup.add(shin);
+    return legGroup;
+  }
+  boss.add(createLeg(-1), createLeg(1));
+
+  const chestSpikeGeo = new THREE.ConeGeometry(0.1, 0.42, 4);
+  for (let i = 0; i < 14; i++){
+    const spike = new THREE.Mesh(chestSpikeGeo, boneSpikeMat);
+    const angle = (i / 14) * Math.PI - Math.PI / 2;
+    spike.position.set(Math.sin(angle) * 1.1, 2.75 + Math.cos(angle) * 0.35, 0.95);
+    spike.rotation.x = Math.PI / 2.5;
+    boss.add(spike);
+  }
+
+  const auraLight = new THREE.PointLight(0xff2200, 2.2, 8);
+  auraLight.position.set(0, 2.2, 1.2);
+  boss.add(auraLight);
+  return boss;
+}
+
+function makeBoss(x, z){
+  const g = createBossMonster();
+  g.scale.setScalar(1.4);
+  g.position.set(x, 0, z);
+  scene.add(g);
+  const flashMats = [];
+  g.traverse(function(o){
+    if (o.isMesh && o.material && o.material.emissive){
+      flashMats.push({m:o.material, e:o.material.emissive.getHex()});
+    }
+  });
+  const bossHp = 40 + wave * 4;
+  const e = {
+    mesh:g, isBoss:true, flashMats:flashMats, flashOn:false,
+    hp:bossHp, maxHp:bossHp, speed:1.5 + wave * 0.03,
+    range:3.0, damage:20,
+    attackCd:0, flashT:0, dead:false, deadT:0, bob:Math.random()*10
+  };
+  g.traverse(function(o){ if (o.isMesh) o.userData.enemy = e; });
+  enemies.push(e);
+  document.getElementById('boss-wrap').style.display='block';
+  updateBossBar(e);
+  return e;
+}
+function updateBossBar(e){
+  const bar = document.getElementById('boss-bar');
+  if (bar) bar.style.width = Math.max(0, e.hp / e.maxHp * 100) + '%';
 }
 
 // ============================================================ game state
@@ -350,11 +473,22 @@ function damageFlash(){ vigT = 0.5; }
 // ============================================================ waves
 function startWave(n){
   wave = n; betweenWaves = false;
-  showBanner('WAVE '+n);
-  const count = 2 + n*2;
-  for (let i=0;i<count;i++){
-    const pos = randRing(30, 55);
-    makeEnemy(pos.x, pos.z);
+  if (n % 5 === 0){
+    showBanner('\u26a0 BOSS WAVE \u26a0');
+    const bp = randRing(32, 42);
+    makeBoss(bp.x, bp.z);
+    const count = 2 + Math.floor(n/2);
+    for (let i=0;i<count;i++){
+      const pos = randRing(30, 55);
+      makeEnemy(pos.x, pos.z);
+    }
+  } else {
+    showBanner('WAVE '+n);
+    const count = 2 + n*2;
+    for (let i=0;i<count;i++){
+      const pos = randRing(30, 55);
+      makeEnemy(pos.x, pos.z);
+    }
   }
   updateHUD();
 }
@@ -377,6 +511,7 @@ function shoot(){
     const e = hits[0].object.userData.enemy;
     if (e && !e.dead){
       e.hp--; e.flashT = 0.12;
+      if (e.isBoss) updateBossBar(e);
       showHitmarker(); sfxHit();
       if (e.hp<=0) killEnemy(e);
     }
@@ -471,6 +606,7 @@ function startGame(){
   // reset
   for (const e of enemies) scene.remove(e.mesh);
   enemies.length = 0;
+  document.getElementById('boss-wrap').style.display='none';
   hp = 100; kills = 0; wave = 0; yaw = 0; pitch = 0;
   player.x = 0; player.z = 0;
   running = true; betweenWaves = true; waveTimer = 1.2;
@@ -543,7 +679,7 @@ function animate(){
       e.bob += dt*8;
       e.mesh.position.y = Math.abs(Math.sin(e.bob))*0.08;
 
-      if (dist > 2.0){
+      if (dist > (e.range || 2.0)){
         const step = e.speed*dt;
         const nx = ex + toX/dist*step, nz = ez + toZ/dist*step;
         // enemies walk around obstacles crudely: slide along if blocked
@@ -553,19 +689,27 @@ function animate(){
       } else {
         e.attackCd -= dt;
         if (e.attackCd <= 0){
-          e.attackCd = 1.0;
-          hp -= 8; damageFlash(); sfxHurt(); updateHUD();
+          e.attackCd = e.isBoss ? 1.4 : 1.0;
+          hp -= (e.damage || 8); damageFlash(); sfxHurt(); updateHUD();
           if (hp <= 0){ gameOver(); }
         }
       }
       // hit flash
       if (e.flashT > 0){
         e.flashT -= dt;
-        e.bodyMat.color.setHex(0xffffff);
-        e.headMat.color.setHex(0xffffff);
+        if (e.flashMats){
+          if (!e.flashOn){ e.flashOn = true; for (const f of e.flashMats) f.m.emissive.setHex(0x888888); }
+        } else {
+          e.bodyMat.color.setHex(0xffffff);
+          e.headMat.color.setHex(0xffffff);
+        }
         if (e.flashT <= 0){
-          e.bodyMat.color.setHex(0x8a2f2f);
-          e.headMat.color.setHex(0xd9b08c);
+          if (e.flashMats){
+            e.flashOn = false; for (const f of e.flashMats) f.m.emissive.setHex(f.e);
+          } else {
+            e.bodyMat.color.setHex(0x8a2f2f);
+            e.headMat.color.setHex(0xd9b08c);
+          }
         }
       }
     }
@@ -604,7 +748,8 @@ window.__game = {
   setPitch: function(p){ pitch = p; },
   shoot: shoot,
   move: function(x,z){ player.x=x; player.z=z; },
-  enemies: function(){ return enemies.map(function(e){ return {x:e.mesh.position.x, z:e.mesh.position.z, hp:e.hp, dead:e.dead}; }); }
+  enemies: function(){ return enemies.map(function(e){ return {x:e.mesh.position.x, z:e.mesh.position.z, hp:e.hp, dead:e.dead, boss:!!e.isBoss}; }); },
+  spawnBoss: function(){ const p = randRing(12, 16); return makeBoss(p.x, p.z); }
 };
 })();
 </script>
