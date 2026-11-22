@@ -116,6 +116,7 @@
   <h1>HUNTING GROUND</h1>
   <div class="sub">Drop in. Survive the waves.<br>Hunt them before they hunt you. &#127907;</div>
   <button class="big-btn" id="btn-start">&#9654; START</button>
+  <div style="position:absolute;bottom:calc(10px + env(safe-area-inset-bottom));right:14px;font-size:12px;color:#7da07d;">v1.1</div>
   <div class="controls-hint">
     &#128241; Left stick: move &nbsp;|&nbsp; Drag right side: aim &nbsp;|&nbsp; FIRE: shoot<br>
     &#128187; WASD: move &nbsp;|&nbsp; Mouse: aim &nbsp;|&nbsp; Click: shoot
@@ -507,7 +508,7 @@ function animate(){
     const speed = 6.2;
     const sin = Math.sin(yaw), cos = Math.cos(yaw);
     const dx = (mx*cos - mz*sin)*speed*dt;
-    const dz = (mx*sin + mz*cos)*speed*dt;
+    const dz = (-mx*sin - mz*cos)*speed*dt;
     if (!collide(player.x+dx, player.z)) player.x += dx;
     if (!collide(player.x, player.z+dz)) player.z += dz;
 
